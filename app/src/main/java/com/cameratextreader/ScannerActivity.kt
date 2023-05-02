@@ -11,6 +11,7 @@ import android.speech.tts.TextToSpeech
 import android.view.LayoutInflater
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -43,13 +44,26 @@ class ScannerActivity : AppCompatActivity() {
         binding = ActivityScannerBinding.inflate(LayoutInflater.from(this))
         setContentView(binding.root)
 
-        getViews()
+        //To handle when user do back gesture
+        onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
+
         initArraysPermissions()
-        checkPermissions()
-        reTakePhoto()
+        checkImageInput(intent.extras)
+        getViews()
+        setBtnReTakePhotoListener()
         setTextRecognizer()
         setTextToSpeech()
-        readTextRecognized()
+        setBtnReadTextRecognizedListener()
+    }
+
+    private fun checkImageInput(extras: Bundle?) {
+        if(extras != null){
+            if(extras.getInt("InputImage") == 1){
+                verifyCameraPermissions()
+            }else{
+                verifyStoragePermissions()
+            }
+        }
     }
 
     private fun getViews() {
@@ -64,7 +78,7 @@ class ScannerActivity : AppCompatActivity() {
         storagePermissions = arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
     }
 
-    private fun checkPermissions(){
+    private fun verifyCameraPermissions(){
         if(checkCameraPermissions()){
             takePhoto()
         }else{
@@ -72,9 +86,17 @@ class ScannerActivity : AppCompatActivity() {
         }
     }
 
-    private fun reTakePhoto(){
+    private fun verifyStoragePermissions(){
+        if(checkStoragePermissions()){
+            pickImageFromGallery()
+        }else{
+            requestStoragePermissions()
+        }
+    }
+
+    private fun setBtnReTakePhotoListener(){
         reScanBtn.setOnClickListener {
-            checkPermissions()
+            verifyCameraPermissions()
             cleanPreviousRecognizedText()
         }
     }
@@ -117,7 +139,7 @@ class ScannerActivity : AppCompatActivity() {
         }
     }
 
-    private fun readTextRecognized(){
+    private fun setBtnReadTextRecognizedListener(){
         listenTextBtn.setOnClickListener {
             if(textRecognized.text.isNotEmpty()){
                 textToSpeech.speak(textRecognized.text.toString(), TextToSpeech.QUEUE_FLUSH, null)
@@ -172,8 +194,10 @@ class ScannerActivity : AppCompatActivity() {
                 val data = result.data
                 imageUri = data!!.data
                 photo.setImageURI(imageUri)
+                recognizeTextFromImage()
             }else{
-                //ninguna imagen fue elegida desde la galeria
+                //No one image picked from gallery
+                finish()
             }
         }
 
@@ -202,8 +226,8 @@ class ScannerActivity : AppCompatActivity() {
                     if (cameraAccepted && storageAccepted) {
                         takePhoto()
                     } else {
+                        //No camera and storage permissions granted
                         finish()
-                        //No se dieron los permisos necesarios para usar la camara
                     }
 
                 }
@@ -212,14 +236,21 @@ class ScannerActivity : AppCompatActivity() {
                 val storageAccepted = grantResults[0] == PackageManager.PERMISSION_GRANTED
 
                 if(storageAccepted){
-                    //abrir galeria
+                    //Open gallery
                     pickImageFromGallery()
                 }else{
-                    //no se dieron los permisos para abrir la galeria
+                    //No camera and storage permissions granted
                     finish()
                 }
             }
         }
+    }
+
+    private val onBackPressedCallback: OnBackPressedCallback = object: OnBackPressedCallback(true){
+        override fun handleOnBackPressed() {
+            finish()
+        }
+
     }
 
     private companion object {
